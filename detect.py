@@ -15,6 +15,23 @@ from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
 
+
+def count(founded_classes,im0):
+  model_values=[]
+  aligns=im0.shape
+  align_bottom=aligns[0]
+  align_right=(aligns[1]/1.7 ) 
+
+  for i, (k, v) in enumerate(founded_classes.items()):
+    a=f"{k} = {v}"
+    model_values.append(v)
+    align_bottom=align_bottom-35                                                   
+    cv2.putText(im0, str(a) ,(int(align_right),align_bottom), cv2.FONT_HERSHEY_SIMPLEX, 1,(45,255,255),1,cv2.LINE_AA)
+  
+
+ 
+
+
 def detect(save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
@@ -84,8 +101,7 @@ def detect(save_img=False):
 
         # Inference
         t1 = time_synchronized()
-        with torch.no_grad():   # Calculating gradients would cause a GPU memory leak
-            pred = model(img, augment=opt.augment)[0]
+        pred = model(img, augment=opt.augment)[0]
         t2 = time_synchronized()
 
         # Apply NMS
@@ -110,12 +126,18 @@ def detect(save_img=False):
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
-
+                
+                founded_classes={} # Creating a dict to storage our detected items
                 # Print results
-                for c in det[:, -1].unique():
-                    n = (det[:, -1] == c).sum()  # detections per class
+                for c in det[:, -1].unique():                 
+                    n = (det[:, -1] == c).sum()  # detections per class                
+                    class_index=int(c)
+                    count_of_object=int(n)
+                    
+                    founded_classes[names[class_index]]=int(n)
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
-
+                    count(founded_classes=founded_classes,im0=im0)  # Applying counter function
+                     
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
@@ -127,10 +149,12 @@ def detect(save_img=False):
                     if save_img or view_img:  # Add bbox to image
                         label = f'{names[int(cls)]} {conf:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
-
+                        cv2.putText(im0, f"Total Objects: {len(det)}", (0, 105), cv2.FONT_HERSHEY_TRIPLEX,
+                                    1, (0, 0, 0), 1)
+                     
             # Print time (inference + NMS)
             print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
-
+            
             # Stream results
             if view_img:
                 cv2.imshow(str(p), im0)
